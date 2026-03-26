@@ -2,6 +2,118 @@
 import { useState, useEffect } from "react";
 import { supabase } from "./supabase";
 
+// ── Service d'envoi d'emails via Resend ───────────────────────────────────────
+const RESEND_KEY = process.env.REACT_APP_RESEND_KEY;
+const ADMIN_EMAIL = process.env.REACT_APP_ADMIN_EMAIL || 'zephir.christophe@hotmail.fr';
+const FROM_EMAIL = 'Run Flash Colis <onboarding@resend.dev>';
+
+const sendEmail = async ({to, subject, html}) => {
+  if(!RESEND_KEY) { console.warn('Resend key manquante'); return; }
+  try {
+    await fetch('https://api.resend.com/emails', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json','Authorization':`Bearer ${RESEND_KEY}`},
+      body: JSON.stringify({from:FROM_EMAIL, to, subject, html}),
+    });
+  } catch(e) { console.error('Email error:', e); }
+};
+
+const emailProspect = (cf) => sendEmail({
+  to: ADMIN_EMAIL,
+  subject: `Nouveau prospect RFC : ${cf.prenom} ${cf.nom} - ${cf.societe||'Particulier'}`,
+  html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+    <div style="background:#0F2D6B;padding:24px;border-radius:12px 12px 0 0">
+      <h1 style="color:#fff;margin:0;font-size:20px">⚡ Nouveau prospect <span style="color:#F97316">Run Flash Colis</span></h1>
+    </div>
+    <div style="background:#F8FAFC;padding:24px;border-radius:0 0 12px 12px;border:1px solid #E2E8F0">
+      <p style="color:#475569;font-size:14px;margin:0 0 16px">Un nouveau client potentiel a rempli le formulaire de contact.</p>
+      <table style="width:100%;border-collapse:collapse">
+        <tr><td style="padding:8px 0;color:#94A3B8;font-size:12px;text-transform:uppercase">Société</td><td style="padding:8px 0;color:#0F2D6B;font-weight:700">${cf.societe||'Non renseigné'}</td></tr>
+        <tr><td style="padding:8px 0;color:#94A3B8;font-size:12px;text-transform:uppercase">Nom</td><td style="padding:8px 0;color:#0F2D6B;font-weight:700">${cf.prenom} ${cf.nom}</td></tr>
+        <tr><td style="padding:8px 0;color:#94A3B8;font-size:12px;text-transform:uppercase">Téléphone</td><td style="padding:8px 0;color:#0F2D6B;font-weight:700">${cf.tel}</td></tr>
+        <tr><td style="padding:8px 0;color:#94A3B8;font-size:12px;text-transform:uppercase">Adresse</td><td style="padding:8px 0;color:#0F2D6B">${cf.adresse||'Non renseigné'}</td></tr>
+        <tr><td style="padding:8px 0;color:#94A3B8;font-size:12px;text-transform:uppercase">Volume mensuel</td><td style="padding:8px 0;color:#F97316;font-weight:700">${cf.volume||'Non renseigné'}</td></tr>
+      </table>
+      <div style="margin-top:20px;padding:14px;background:#FFF7ED;border-radius:8px;border:1px solid #FED7AA">
+        <p style="margin:0;color:#92400E;font-size:13px">Pensez à contacter ce prospect rapidement !</p>
+      </div>
+    </div>
+  </div>`
+});
+
+const emailCompteClient = (client) => sendEmail({
+  to: client.email,
+  subject: 'Bienvenue sur Run Flash Colis - Vos identifiants',
+  html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+    <div style="background:#0F2D6B;padding:24px;border-radius:12px 12px 0 0">
+      <h1 style="color:#fff;margin:0;font-size:20px">⚡ Bienvenue sur <span style="color:#F97316">Run Flash Colis</span></h1>
+    </div>
+    <div style="background:#F8FAFC;padding:24px;border-radius:0 0 12px 12px;border:1px solid #E2E8F0">
+      <p style="color:#475569">Bonjour <strong>${client.name}</strong>, votre espace client est prêt !</p>
+      <div style="background:#fff;padding:20px;border-radius:8px;border:1px solid #E2E8F0;margin:16px 0">
+        <p style="margin:0 0 8px;color:#94A3B8;font-size:12px;text-transform:uppercase">Vos identifiants de connexion</p>
+        <p style="margin:0 0 6px"><strong>Email :</strong> ${client.email}</p>
+        <p style="margin:0 0 6px"><strong>Mot de passe :</strong> ${client.password}</p>
+        <p style="margin:0"><strong>Jour de collecte :</strong> ${client.jour}</p>
+      </div>
+      <a href="https://runflashcolis-fmyq.vercel.app" style="display:inline-block;background:#F97316;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:700;margin-top:8px">
+        Accéder à mon espace →
+      </a>
+      <p style="color:#94A3B8;font-size:12px;margin-top:16px">Tarif : <strong>5,90 € par colis livré</strong> · Île de La Réunion</p>
+    </div>
+  </div>`
+});
+
+const emailStatutColis = (order, newStatus, clientEmail) => {
+  const messages = {
+    recupere: {
+      subject: `📦 Colis récupéré - ${order.num}`,
+      icon: '📦', color: '#1E40AF', bg: '#DBEAFE',
+      title: 'Votre colis a été récupéré',
+      text: 'Notre livreur a bien récupéré votre colis. Il sera livré prochainement.',
+    },
+    en_livraison: {
+      subject: `🚐 Colis en cours de livraison - ${order.num}`,
+      icon: '🚐', color: '#5B21B6', bg: '#EDE9FE',
+      title: 'Votre colis est en route',
+      text: 'Votre colis est actuellement en cours de livraison.',
+    },
+    livre: {
+      subject: `✅ Colis livré - ${order.num}`,
+      icon: '✅', color: '#065F46', bg: '#D1FAE5',
+      title: 'Votre colis a été livré !',
+      text: `Votre colis a été livré avec succès à <strong>${order.dest.name}</strong>.`,
+    },
+  };
+  const m = messages[newStatus];
+  if(!m) return;
+  return sendEmail({
+    to: clientEmail,
+    subject: m.subject,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto">
+      <div style="background:#0F2D6B;padding:24px;border-radius:12px 12px 0 0">
+        <h1 style="color:#fff;margin:0;font-size:20px">⚡ <span style="color:#F97316">Run Flash Colis</span></h1>
+      </div>
+      <div style="background:#F8FAFC;padding:24px;border-radius:0 0 12px 12px;border:1px solid #E2E8F0">
+        <div style="background:${m.bg};border-radius:8px;padding:16px;margin-bottom:16px;text-align:center">
+          <div style="font-size:36px">${m.icon}</div>
+          <h2 style="color:${m.color};margin:8px 0 4px">${m.title}</h2>
+          <p style="color:${m.color};margin:0;font-size:13px">${m.text}</p>
+        </div>
+        <table style="width:100%;border-collapse:collapse">
+          <tr><td style="padding:8px 0;color:#94A3B8;font-size:12px">N° de suivi</td><td style="padding:8px 0;color:#0F2D6B;font-weight:700;font-family:monospace">${order.num}</td></tr>
+          <tr><td style="padding:8px 0;color:#94A3B8;font-size:12px">Destinataire</td><td style="padding:8px 0;color:#0F2D6B;font-weight:700">${order.dest.name}</td></tr>
+          <tr><td style="padding:8px 0;color:#94A3B8;font-size:12px">Adresse</td><td style="padding:8px 0;color:#0F2D6B">${order.dest.rue}, ${order.dest.city}</td></tr>
+          <tr><td style="padding:8px 0;color:#94A3B8;font-size:12px">Description</td><td style="padding:8px 0;color:#0F2D6B">${order.desc||order.description||''}</td></tr>
+        </table>
+        <p style="color:#94A3B8;font-size:11px;margin-top:20px;border-top:1px solid #E2E8F0;padding-top:12px">
+          Run Flash Colis · 28 Chemin Dozinval, Les Avirons 97425 · Île de La Réunion
+        </p>
+      </div>
+    </div>`
+  });
+};
+
 const C={navy:'#0F2D6B',orange:'#F97316',orangeL:'#FFF7ED',green:'#10B981',blue:'#3B82F6',gray0:'#F8FAFC',gray1:'#F1F5F9',gray2:'#E2E8F0',gray4:'#94A3B8',gray6:'#475569',white:'#FFFFFF'};
 const STATUS={en_attente:{l:'En attente',c:'#92400E',bg:'#FEF3C7',dot:'#F59E0B',icon:'⏳'},recupere:{l:'Récupéré',c:'#1E40AF',bg:'#DBEAFE',dot:'#3B82F6',icon:'📦'},en_livraison:{l:'En livraison',c:'#5B21B6',bg:'#EDE9FE',dot:'#8B5CF6',icon:'🚐'},livre:{l:'Livré',c:'#065F46',bg:'#D1FAE5',dot:'#10B981',icon:'✅'}};
 const NEXT={en_attente:'recupere',recupere:'en_livraison',en_livraison:'livre'};
@@ -207,6 +319,9 @@ export default function App(){
     if(error){toast('Erreur','err');return;}
     setOrders(p=>p.map(o=>o.id===id?{...o,status:ns}:o));
     toast(`${STATUS[ns].icon} ${STATUS[ns].l}`);
+    // Envoyer email au client e-commerçant
+    const client=users.find(u=>u.id===o.cid);
+    if(client?.email) emailStatutColis(o, ns, client.email);
   };
 
   const createAccount=async newUser=>{
@@ -215,7 +330,10 @@ export default function App(){
     const{error}=await supabase.from('users').insert([userData]);
     if(error){toast('Erreur','err');return false;}
     setUsers(p=>[...p,userData]);
-    toast(`Compte créé !`);return true;
+    toast(`Compte créé !`);
+    // Envoyer email de bienvenue avec identifiants
+    emailCompteClient(newUser);
+    return true;
   };
 
   const updateAccount=async updated=>{
@@ -578,7 +696,11 @@ function LandingPage({onLogin}){
                   {v:'100+',l:'Plus de 100 colis / mois'},
                 ]}/>
               </div>
-              <button onClick={()=>{if(!cf.nom||!cf.tel){alert('Merci de renseigner votre nom et telephone.');return;}setSent(true);}}
+              <button onClick={()=>{
+                if(!cf.nom||!cf.tel){alert('Merci de renseigner votre nom et telephone.');return;}
+                emailProspect(cf);
+                setSent(true);
+              }}
                 style={{width:'100%',marginTop:8,padding:'14px',background:C.orange,color:'#fff',border:'none',borderRadius:10,fontSize:15,fontWeight:800,cursor:'pointer',boxShadow:'0 4px 14px rgba(249,115,22,.4)'}}>
                 Envoyer ma demande
               </button>
