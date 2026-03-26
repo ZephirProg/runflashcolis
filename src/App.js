@@ -144,6 +144,14 @@ export default function App(){
   const [form,setForm]=useState({name:'',rue:'',complement:'',city:'',tel:'',poids:'',desc:''});
   const [loginForm,setLoginForm]=useState({email:'',password:''});
   const [loginErr,setLoginErr]=useState('');
+  const [isMobile,setIsMobile]=useState(window.innerWidth<768);
+  const [menuOpen,setMenuOpen]=useState(false);
+
+  useEffect(()=>{
+    const onResize=()=>setIsMobile(window.innerWidth<768);
+    window.addEventListener('resize',onResize);
+    return()=>window.removeEventListener('resize',onResize);
+  },[]);
 
   const toast=(msg,type='ok')=>{setNotif({msg,type});setTimeout(()=>setNotif(null),3500);};
   const isAdmin=u=>u?.role==='livreur'||u?.role==='adminRFC';
@@ -324,6 +332,94 @@ export default function App(){
     if(view==='facturation') content=<Facturation byClient={byClient} livrees={livrees} printFacture={printFacture}/>;
   }
 
+  const navItem=(item)=>(
+    <button key={item.v} onClick={()=>{setView(item.v);setMenuOpen(false);}}
+      style={{display:'flex',alignItems:'center',gap:10,width:'100%',padding:'9px 12px',borderRadius:8,marginBottom:3,border:'none',cursor:'pointer',textAlign:'left',
+        background:view===item.v?'rgba(249,115,22,.15)':'transparent',
+        color:view===item.v?C.orange:'rgba(255,255,255,.55)',
+        fontWeight:view===item.v?600:400,fontSize:13}}>
+      <span style={{fontSize:15}}>{item.icon}</span>{item.label}
+      {item.badge>0&&<span style={{marginLeft:'auto',background:C.orange,color:'#fff',borderRadius:20,padding:'0 6px',fontSize:10,fontWeight:700}}>{item.badge}</span>}
+    </button>
+  );
+
+  // ── MOBILE ────────────────────────────────────────────────────────────────
+  if(isMobile) return (
+    <div style={{minHeight:'100vh',background:C.gray0,fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif',paddingBottom:70}}>
+      {/* Top bar mobile */}
+      <div style={{background:C.navy,padding:'12px 16px',display:'flex',alignItems:'center',justifyContent:'space-between',position:'sticky',top:0,zIndex:100,boxShadow:'0 2px 8px rgba(0,0,0,.3)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <Logo size={32}/>
+          <div style={{lineHeight:1.1}}>
+            <span style={{color:'#fff',fontWeight:900,fontSize:13}}>RUN </span>
+            <span style={{color:C.orange,fontWeight:900,fontSize:13}}>FLASH</span>
+            <span style={{color:'#fff',fontWeight:900,fontSize:13}}> COLIS</span>
+          </div>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          {pending.length>0&&<span style={{background:C.orange,color:'#fff',borderRadius:20,padding:'2px 8px',fontSize:11,fontWeight:700}}>{pending.length}</span>}
+          <button onClick={()=>setMenuOpen(p=>!p)}
+            style={{background:'rgba(255,255,255,.1)',border:'none',color:'#fff',borderRadius:8,padding:'8px 12px',cursor:'pointer',fontSize:18,lineHeight:1}}>
+            {menuOpen?'✕':'☰'}
+          </button>
+        </div>
+      </div>
+
+      {/* Menu mobile overlay */}
+      {menuOpen&&(
+        <div style={{position:'fixed',inset:0,zIndex:200,display:'flex'}}>
+          <div style={{flex:1,background:'rgba(0,0,0,.5)'}} onClick={()=>setMenuOpen(false)}/>
+          <div style={{width:280,background:C.navy,height:'100%',overflowY:'auto',display:'flex',flexDirection:'column'}}>
+            <div style={{padding:'20px 16px',borderBottom:'1px solid rgba(255,255,255,.08)'}}>
+              <div style={{display:'flex',alignItems:'center',gap:10}}>
+                <div style={{width:38,height:38,borderRadius:'50%',background:C.orange,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:14,fontWeight:700}}>{user.initials}</div>
+                <div>
+                  <div style={{color:'#fff',fontSize:13,fontWeight:600}}>{user.name}</div>
+                  <div style={{color:'rgba(255,255,255,.4)',fontSize:11}}>{user.role==='livreur'?'Livreur':user.role==='adminRFC'?'Admin RFC':'E-commercant'}</div>
+                  {user.role==='ecommercant'&&<div style={{color:C.orange,fontSize:11,fontWeight:700}}>Collecte : {user.jour}</div>}
+                </div>
+              </div>
+            </div>
+            <nav style={{padding:'10px',flex:1}}>{sideItems.map(navItem)}</nav>
+            {user.role==='ecommercant'&&(
+              <div style={{padding:'10px',borderTop:'1px solid rgba(255,255,255,.06)'}}>
+                <div style={{padding:'12px',borderRadius:8,background:'rgba(249,115,22,.1)',border:'1px solid rgba(249,115,22,.2)',textAlign:'center'}}>
+                  <div style={{color:C.orange,fontWeight:800,fontSize:22}}>{PRICE.toFixed(2)} €</div>
+                  <div style={{color:'rgba(255,255,255,.4)',fontSize:11}}>par colis livre</div>
+                </div>
+              </div>
+            )}
+            <div style={{padding:'12px 10px',borderTop:'1px solid rgba(255,255,255,.08)'}}>
+              <button onClick={doLogout} style={{width:'100%',padding:'10px',background:'rgba(255,255,255,.06)',color:'rgba(255,255,255,.5)',border:'none',borderRadius:8,cursor:'pointer',fontSize:13}}>
+                Deconnexion
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Contenu mobile */}
+      <div style={{padding:'16px'}}>{content}</div>
+
+      {/* Bottom nav mobile */}
+      <div style={{position:'fixed',bottom:0,left:0,right:0,background:C.navy,display:'flex',borderTop:'1px solid rgba(255,255,255,.1)',zIndex:99}}>
+        {sideItems.slice(0,5).map(item=>(
+          <button key={item.v} onClick={()=>setView(item.v)}
+            style={{flex:1,padding:'8px 4px',border:'none',cursor:'pointer',background:'transparent',color:view===item.v?C.orange:'rgba(255,255,255,.4)',display:'flex',flexDirection:'column',alignItems:'center',gap:2,position:'relative'}}>
+            <span style={{fontSize:18}}>{item.icon}</span>
+            <span style={{fontSize:8,fontWeight:view===item.v?700:400}}>{item.label.split(' ')[0]}</span>
+            {item.badge>0&&<span style={{position:'absolute',top:4,right:'calc(50% - 14px)',background:C.orange,color:'#fff',borderRadius:20,padding:'0 4px',fontSize:9,fontWeight:700}}>{item.badge}</span>}
+          </button>
+        ))}
+      </div>
+
+      {notif&&<div style={{position:'fixed',bottom:80,left:16,right:16,background:notif.type==='err'?'#7F1D1D':C.navy,color:'#fff',padding:'12px 16px',borderRadius:10,fontSize:13,fontWeight:500,boxShadow:'0 8px 30px rgba(0,0,0,.3)',zIndex:9999,display:'flex',alignItems:'center',gap:10}}>
+        <span>{notif.type==='err'?'❌':'✅'}</span><span>{notif.msg}</span>
+      </div>}
+    </div>
+  );
+
+  // ── DESKTOP ───────────────────────────────────────────────────────────────
   return (
     <div style={{display:'flex',minHeight:'100vh',background:C.gray0,fontFamily:'-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif'}}>
       <div style={{width:230,background:C.navy,display:'flex',flexDirection:'column',flexShrink:0,minHeight:'100vh',position:'sticky',top:0,maxHeight:'100vh',overflowY:'auto'}}>
@@ -350,23 +446,12 @@ export default function App(){
             </div>
           </div>
         </div>
-        <nav style={{padding:'10px',flex:1}}>
-          {sideItems.map(item=>(
-            <button key={item.v} onClick={()=>setView(item.v)}
-              style={{display:'flex',alignItems:'center',gap:10,width:'100%',padding:'9px 12px',borderRadius:8,marginBottom:3,border:'none',cursor:'pointer',textAlign:'left',
-                background:view===item.v?'rgba(249,115,22,.15)':'transparent',
-                color:view===item.v?C.orange:'rgba(255,255,255,.55)',
-                fontWeight:view===item.v?600:400,fontSize:13}}>
-              <span style={{fontSize:15}}>{item.icon}</span>{item.label}
-              {item.badge>0&&<span style={{marginLeft:'auto',background:C.orange,color:'#fff',borderRadius:20,padding:'0 6px',fontSize:10,fontWeight:700}}>{item.badge}</span>}
-            </button>
-          ))}
-        </nav>
+        <nav style={{padding:'10px',flex:1}}>{sideItems.map(navItem)}</nav>
         {user.role==='ecommercant'&&(
           <div style={{padding:'10px',borderTop:'1px solid rgba(255,255,255,.06)'}}>
             <div style={{padding:'12px',borderRadius:8,background:'rgba(249,115,22,.1)',border:'1px solid rgba(249,115,22,.2)'}}>
               <div style={{color:'rgba(255,255,255,.5)',fontSize:10,textTransform:'uppercase',marginBottom:4}}>Tarif livraison</div>
-              <div style={{color:C.orange,fontWeight:800,fontSize:18}}>{PRICE.toFixed(2)} EUR</div>
+              <div style={{color:C.orange,fontWeight:800,fontSize:18}}>{PRICE.toFixed(2)} €</div>
               <div style={{color:'rgba(255,255,255,.35)',fontSize:10}}>par colis livre</div>
             </div>
           </div>
@@ -380,7 +465,7 @@ export default function App(){
       <div style={{flex:1,padding:28,overflowY:'auto',minWidth:0}}>{content}</div>
       {notif&&(
         <div style={{position:'fixed',bottom:22,right:22,background:notif.type==='err'?'#7F1D1D':C.navy,color:'#fff',padding:'12px 20px',borderRadius:10,fontSize:13,fontWeight:500,boxShadow:'0 8px 30px rgba(0,0,0,.3)',zIndex:9999,maxWidth:360,display:'flex',alignItems:'center',gap:10}}>
-          <span>{notif.type==='err'?'Erreur':'OK'}</span><span>{notif.msg}</span>
+          <span>{notif.type==='err'?'❌':'✅'}</span><span>{notif.msg}</span>
         </div>
       )}
     </div>
