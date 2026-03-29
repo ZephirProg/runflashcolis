@@ -8,12 +8,11 @@ const ADMIN_EMAIL = process.env.REACT_APP_ADMIN_EMAIL || 'zephir.christophe@hotm
 const FROM_EMAIL = 'Run Flash Colis <onboarding@resend.dev>';
 
 const sendEmail = async ({to, subject, html}) => {
-  if(!RESEND_KEY) { console.warn('Resend key manquante'); return; }
   try {
-    await fetch('https://api.resend.com/emails', {
+    await fetch('/api/send-email', {
       method: 'POST',
-      headers: {'Content-Type':'application/json','Authorization':`Bearer ${RESEND_KEY}`},
-      body: JSON.stringify({from:FROM_EMAIL, to, subject, html}),
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({to, subject, html}),
     });
   } catch(e) { console.error('Email error:', e); }
 };
