@@ -445,7 +445,7 @@ export default function App(){
     if(view==='dashboard') content=<LivreurDash orders={orders} pending={pending} nav={setView}/>;
     if(view==='tournees') content=<Tournees orders={orders} users={users} selDay={selDay} setSelDay={setSelDay} dayRoute={dayRoute} buildMapsUrl={buildMapsUrl} mapsAddr={mapsAddr}/>;
     if(view==='statuts') content=<Statuts orders={orders} updateStatus={updateStatus}/>;
-    if(view==='comptes') content=<GestionComptes users={users.filter(u=>u.role==='ecommercant')} createAccount={createAccount} updateAccount={updateAccount}/>;
+    if(view==='comptes') content=<GestionComptes users={users} createAccount={createAccount} updateAccount={updateAccount}/>;
     if(view==='facturation') content=<Facturation byClient={byClient} livrees={livrees} printFacture={printFacture}/>;
   }
 
@@ -1213,77 +1213,132 @@ function Statuts({orders,updateStatus}){
 
 function GestionComptes({users,createAccount,updateAccount}){
   const [showForm,setShowForm]=useState(false);
+  const [roleForm,setRoleForm]=useState('ecommercant');
   const [editId,setEditId]=useState(null);
+  const [onglet,setOnglet]=useState('ecommercant');
   const [form,setForm]=useState({name:'',email:'',password:'',siret:'',adresse:'',complement:'',ville:'',tel:'',jour:'Lundi'});
   const f=(k,v)=>setForm(p=>({...p,[k]:v}));
+
+  const ROLES={
+    ecommercant:{l:'E-commerçant',icon:'🛍️',color:C.orange},
+    livreur:{l:'Livreur',icon:'🚐',color:C.blue},
+    adminRFC:{l:'Administrateur RFC',icon:'🛡️',color:'#8B5CF6'},
+  };
+
   const handleCreate=async()=>{
     if(!form.name||!form.email||!form.password) return;
-    if(await createAccount(form)){
+    const data={...form,role:roleForm};
+    if(await createAccount(data)){
       setForm({name:'',email:'',password:'',siret:'',adresse:'',complement:'',ville:'',tel:'',jour:'Lundi'});
       setShowForm(false);
     }
   };
+
+  const filteredUsers=users.filter(u=>u.role===onglet);
+
   return (
     <div>
       <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:24,flexWrap:'wrap',gap:12}}>
         <div>
-          <h1 style={{fontSize:22,fontWeight:900,color:C.navy,margin:0}}>Gestion des clients</h1>
-          <p style={{color:C.gray4,fontSize:13,margin:'4px 0 0'}}>Comptes sauvegardes dans la base de donnees</p>
+          <h1 style={{fontSize:22,fontWeight:900,color:C.navy,margin:0}}>Gestion des utilisateurs</h1>
+          <p style={{color:C.gray4,fontSize:13,margin:'4px 0 0'}}>{users.length} compte(s) au total</p>
         </div>
         <button onClick={()=>{setShowForm(p=>!p);setEditId(null);}}
           style={{padding:'10px 20px',background:showForm?C.gray2:C.orange,color:showForm?C.gray6:'#fff',border:'none',borderRadius:9,fontSize:13,fontWeight:700,cursor:'pointer'}}>
-          {showForm?'Annuler':'Nouveau client'}
+          {showForm?'Annuler':'➕ Nouveau compte'}
         </button>
       </div>
+
+      {/* Onglets par rôle */}
+      <div style={{display:'flex',gap:8,marginBottom:20,flexWrap:'wrap'}}>
+        {Object.entries(ROLES).map(([role,info])=>{
+          const cnt=users.filter(u=>u.role===role).length;
+          const isActive=onglet===role;
+          return(
+            <button key={role} onClick={()=>setOnglet(role)}
+              style={{padding:'9px 16px',borderRadius:10,border:`2px solid ${isActive?info.color:C.gray2}`,background:isActive?'#F8FAFC':'#fff',color:isActive?info.color:C.gray6,fontSize:13,fontWeight:700,cursor:'pointer',display:'flex',alignItems:'center',gap:7}}>
+              {info.icon} {info.l}
+              <span style={{background:isActive?info.color:C.gray2,color:'#fff',borderRadius:20,padding:'0 7px',fontSize:10,fontWeight:800}}>{cnt}</span>
+            </button>
+          );
+        })}
+      </div>
+
       {showForm&&(
         <Card style={{marginBottom:20,border:`2px solid ${C.orange}`,background:C.orangeL}}>
-          <h3 style={{margin:'0 0 18px',fontSize:14,fontWeight:800,color:C.navy}}>Creer un compte e-commercant</h3>
+          <h3 style={{margin:'0 0 18px',fontSize:14,fontWeight:800,color:C.navy}}>Creer un nouveau compte</h3>
+
+          {/* Choix du rôle */}
+          <div style={{display:'flex',gap:8,marginBottom:20}}>
+            {Object.entries(ROLES).map(([role,info])=>(
+              <button key={role} onClick={()=>setRoleForm(role)}
+                style={{flex:1,padding:'10px',borderRadius:8,border:`2px solid ${roleForm===role?info.color:C.gray2}`,background:roleForm===role?'#fff':'transparent',color:roleForm===role?info.color:C.gray6,fontSize:12,fontWeight:700,cursor:'pointer'}}>
+                {info.icon} {info.l}
+              </button>
+            ))}
+          </div>
+
           <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-            <Inp label="Nom de la boutique" value={form.name} onChange={v=>f('name',v)} placeholder="BoutiqueMode974" required/>
-            <Inp label="SIRET" value={form.siret} onChange={v=>f('siret',v)} placeholder="12345678901234" hint="14 chiffres"/>
-            <Inp label="Email" value={form.email} onChange={v=>f('email',v)} placeholder="boutique@email.re" required/>
+            <Inp label="Nom complet / Boutique" value={form.name} onChange={v=>f('name',v)} placeholder={roleForm==='ecommercant'?'BoutiqueMode974':'Jean-Marie Dupont'} required/>
+            <Inp label="Email" value={form.email} onChange={v=>f('email',v)} placeholder="contact@email.re" required/>
             <Inp label="Mot de passe" value={form.password} onChange={v=>f('password',v)} placeholder="Mot de passe" type="password" required/>
             <Inp label="Telephone" value={form.tel} onChange={v=>f('tel',v)} placeholder="0262 00 00 00"/>
-            <Sel label="Jour de collecte" value={form.jour} onChange={v=>f('jour',v)} options={JOURS.map(j=>({v:j,l:j}))}/>
           </div>
-          <div style={{background:'#EFF6FF',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'#1D4ED8'}}>
-            Adresse point de collecte - integree dans le calcul GPS
-          </div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
-            <Inp label="Numero et nom de rue" value={form.adresse} onChange={v=>f('adresse',v)} placeholder="5 Rue du Commerce" hint="Pour Google Maps"/>
-            <Inp label="Complement" value={form.complement} onChange={v=>f('complement',v)} placeholder="Zone artisanale..." hint="Non envoye a Google Maps"/>
-            <div style={{gridColumn:'1/-1'}}>
-              <Inp label="Ville / Code postal" value={form.ville} onChange={v=>f('ville',v)} placeholder="Saint-Denis 97400" required/>
+
+          {roleForm==='ecommercant'&&(<>
+            <div style={{borderTop:`1px solid ${C.gray2}`,margin:'12px 0'}}/>
+            <div style={{background:'#EFF6FF',borderRadius:8,padding:'10px 14px',marginBottom:16,fontSize:12,color:'#1D4ED8'}}>
+              Informations specifiques e-commercant
             </div>
-          </div>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:16}}>
+              <Inp label="SIRET" value={form.siret} onChange={v=>f('siret',v)} placeholder="12345678901234" hint="14 chiffres"/>
+              <Sel label="Jour de collecte" value={form.jour} onChange={v=>f('jour',v)} options={JOURS.map(j=>({v:j,l:j}))}/>
+              <Inp label="Numero et nom de rue" value={form.adresse} onChange={v=>f('adresse',v)} placeholder="5 Rue du Commerce" hint="Pour Google Maps"/>
+              <Inp label="Complement" value={form.complement} onChange={v=>f('complement',v)} placeholder="Zone artisanale..." hint="Non envoye a Google Maps"/>
+              <div style={{gridColumn:'1/-1'}}>
+                <Inp label="Ville / Code postal" value={form.ville} onChange={v=>f('ville',v)} placeholder="Saint-Denis 97400"/>
+              </div>
+            </div>
+          </>)}
+
           <button onClick={handleCreate} style={{padding:'11px 28px',background:C.navy,color:'#fff',border:'none',borderRadius:8,fontSize:14,fontWeight:800,cursor:'pointer'}}>
-            Creer le compte
+            Creer le compte {ROLES[roleForm].icon}
           </button>
         </Card>
       )}
-      {users.length===0 ? (
+      {filteredUsers.length===0 ? (
         <Card style={{textAlign:'center',padding:48}}>
-          <div style={{fontSize:44,marginBottom:10}}>OK</div>
-          <div style={{fontWeight:800,color:C.navy,fontSize:16}}>Aucun client enregistre</div>
+          <div style={{fontSize:44,marginBottom:10}}>{ROLES[onglet].icon}</div>
+          <div style={{fontWeight:800,color:C.navy,fontSize:16}}>Aucun {ROLES[onglet].l} enregistre</div>
+          <button onClick={()=>{setShowForm(true);setRoleForm(onglet);}} style={{marginTop:16,padding:'10px 24px',background:C.orange,color:'#fff',border:'none',borderRadius:8,cursor:'pointer',fontSize:13,fontWeight:700}}>
+            Creer un {ROLES[onglet].l}
+          </button>
         </Card>
       ) : (
         <div style={{display:'flex',flexDirection:'column',gap:12}}>
-          {users.map(u=>(
+          {filteredUsers.map(u=>(
             <Card key={u.id} style={{padding:'18px 22px'}}>
               {editId===u.id ? (
                 <EditClientForm u={u} onSave={async updated=>{await updateAccount(updated);setEditId(null);}} onCancel={()=>setEditId(null)}/>
               ) : (
                 <div style={{display:'flex',alignItems:'flex-start',gap:16,flexWrap:'wrap'}}>
-                  <div style={{width:44,height:44,background:C.navy,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:800,fontSize:16,flexShrink:0}}>{u.initials}</div>
+                  <div style={{width:44,height:44,background:u.role==='livreur'?C.blue:u.role==='adminRFC'?'#8B5CF6':C.navy,borderRadius:10,display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:800,fontSize:18,flexShrink:0}}>
+                    {ROLES[u.role]?.icon||u.initials}
+                  </div>
                   <div style={{flex:1,minWidth:200}}>
-                    <div style={{fontWeight:800,color:C.navy,fontSize:16}}>{u.name}</div>
-                    <div style={{color:C.gray4,fontSize:12,marginTop:2}}>{u.email}</div>
+                    <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
+                      <div style={{fontWeight:800,color:C.navy,fontSize:16}}>{u.name}</div>
+                      <span style={{background:u.role==='livreur'?'#DBEAFE':u.role==='adminRFC'?'#EDE9FE':'#FEF3C7',color:u.role==='livreur'?'#1E40AF':u.role==='adminRFC'?'#5B21B6':'#92400E',padding:'2px 8px',borderRadius:20,fontSize:10,fontWeight:700}}>
+                        {ROLES[u.role]?.l}
+                      </span>
+                    </div>
+                    <div style={{color:C.gray4,fontSize:12}}>{u.email}</div>
                     {u.siret&&<div style={{color:C.gray4,fontSize:11,marginTop:2}}>SIRET : {u.siret}</div>}
-                    {u.adresse&&<div style={{marginTop:6,fontSize:12,color:C.gray6}}>{u.adresse}{u.complement&&`, ${u.complement}`}, {u.ville}</div>}
-                    {u.tel&&<div style={{fontSize:12,color:C.gray6,marginTop:2}}>{u.tel}</div>}
+                    {u.adresse&&<div style={{marginTop:4,fontSize:12,color:C.gray6}}>📍 {u.adresse}{u.complement&&`, ${u.complement}`}, {u.ville}</div>}
+                    {u.tel&&<div style={{fontSize:12,color:C.gray6,marginTop:2}}>📞 {u.tel}</div>}
                   </div>
                   <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
-                    <div style={{background:'#FEF3C7',color:'#92400E',padding:'5px 14px',borderRadius:20,fontSize:12,fontWeight:800}}>{u.jour}</div>
+                    {u.jour&&<div style={{background:'#FEF3C7',color:'#92400E',padding:'5px 14px',borderRadius:20,fontSize:12,fontWeight:800}}>{u.jour}</div>}
                     <button onClick={()=>setEditId(u.id)}
                       style={{padding:'7px 14px',background:C.gray1,color:C.gray6,border:`1px solid ${C.gray2}`,borderRadius:7,fontSize:12,cursor:'pointer',fontWeight:600}}>
                       Modifier
