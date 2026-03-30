@@ -342,6 +342,14 @@ export default function App(){
     toast('Compte mis à jour !');
   };
 
+  const deleteAccount=async u=>{
+    if(!window.confirm(`Supprimer le compte "${u.name}" ? Cette action est irréversible.`)) return;
+    const{error}=await supabase.from('users').delete().eq('id',u.id);
+    if(error){toast('Erreur lors de la suppression','err');return;}
+    setUsers(p=>p.filter(x=>x.id!==u.id));
+    toast(`Compte "${u.name}" supprimé !`);
+  };
+
   const printLabel=o=>{
     const w=window.open('','_blank','width=520,height=760');
     const desc=o.desc||o.description||'';
@@ -445,7 +453,7 @@ export default function App(){
     if(view==='dashboard') content=<LivreurDash orders={orders} pending={pending} nav={setView}/>;
     if(view==='tournees') content=<Tournees orders={orders} users={users} selDay={selDay} setSelDay={setSelDay} dayRoute={dayRoute} buildMapsUrl={buildMapsUrl} mapsAddr={mapsAddr}/>;
     if(view==='statuts') content=<Statuts orders={orders} updateStatus={updateStatus}/>;
-    if(view==='comptes') content=<GestionComptes users={users} createAccount={createAccount} updateAccount={updateAccount}/>;
+    if(view==='comptes') content=<GestionComptes users={users} createAccount={createAccount} updateAccount={updateAccount} deleteAccount={deleteAccount}/>;
     if(view==='facturation') content=<Facturation byClient={byClient} livrees={livrees} printFacture={printFacture}/>;
   }
 
@@ -1211,7 +1219,7 @@ function Statuts({orders,updateStatus}){
   );
 }
 
-function GestionComptes({users,createAccount,updateAccount}){
+function GestionComptes({users,createAccount,updateAccount,deleteAccount}){
   const [showForm,setShowForm]=useState(false);
   const [roleForm,setRoleForm]=useState('ecommercant');
   const [editId,setEditId]=useState(null);
@@ -1341,7 +1349,11 @@ function GestionComptes({users,createAccount,updateAccount}){
                     {u.jour&&<div style={{background:'#FEF3C7',color:'#92400E',padding:'5px 14px',borderRadius:20,fontSize:12,fontWeight:800}}>{u.jour}</div>}
                     <button onClick={()=>setEditId(u.id)}
                       style={{padding:'7px 14px',background:C.gray1,color:C.gray6,border:`1px solid ${C.gray2}`,borderRadius:7,fontSize:12,cursor:'pointer',fontWeight:600}}>
-                      Modifier
+                      ✏️ Modifier
+                    </button>
+                    <button onClick={()=>deleteAccount(u)}
+                      style={{padding:'7px 14px',background:'#FEF2F2',color:'#DC2626',border:'1px solid #FECACA',borderRadius:7,fontSize:12,cursor:'pointer',fontWeight:600}}>
+                      🗑️ Supprimer
                     </button>
                   </div>
                 </div>
