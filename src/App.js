@@ -325,13 +325,17 @@ export default function App(){
 
   const createAccount=async newUser=>{
     if(users.find(u=>u.email===newUser.email)){toast('Email déjà utilisé','err');return false;}
-    const userData={...newUser,id:`e${Date.now()}`,role:'ecommercant',initials:newUser.name.slice(0,2).toUpperCase()};
+    const userData={
+      ...newUser,
+      id:`e${Date.now()}`,
+      role: newUser.role||'ecommercant',
+      initials: newUser.name.slice(0,2).toUpperCase()
+    };
     const{error}=await supabase.from('users').insert([userData]);
     if(error){toast('Erreur','err');return false;}
     setUsers(p=>[...p,userData]);
-    toast(`Compte créé !`);
-    // Envoyer email de bienvenue avec identifiants
-    emailCompteClient(newUser);
+    toast(`Compte ${userData.role} créé !`);
+    if(newUser.role==='ecommercant') emailCompteClient(newUser);
     return true;
   };
 
